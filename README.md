@@ -6,6 +6,17 @@ frame-exact timing, libass typography, sidechain-ducked mixes, true-peak-safe lo
 
 Pure Python standard library + ffmpeg. No virtualenv, no pip install.
 
+## Use it from any repo
+
+```sh
+./scripts/install.sh   # links `souvi` onto PATH, the `souvi` skill and `souvi` subagent into ~/.claude
+```
+
+Then, in any project, ask Claude to "use SouVi to …": the `souvi` skill loads on demand, or delegate to the
+`souvi` subagent, which has the skill preloaded. Media comes in with `souvi import <slug> <files>` and
+results go back with `souvi promote <render> --to <dir>`. Any number of agents can work at once: each job
+runs in a private folder, outputs are versioned atomically, and renders of one project queue on a lock.
+
 ```sh
 ./souvi doctor                                   # verify ffmpeg, encoders, fonts, GPU
 ./souvi new spring-launch --preset social-vertical
@@ -29,8 +40,9 @@ output/<slug>/     drafts/ renders/ final/ review/
 cache/<slug>/      intermediates (disposable, ignored)
 presets/           delivery formats, colour looks, title styles
 engine/            the engine (timeline.py is the renderer)
+skill/             the `souvi` skill: SKILL.md (manual) + video.md, audio.md (craft, loaded on demand)
+agent/souvi.md     the `souvi` subagent (preloads the skill)
 docs/timeline.md   timeline schema
-.claude/skills/    craft standards Claude loads for video and audio work
 ```
 
 ## Capabilities
@@ -47,7 +59,7 @@ docs/timeline.md   timeline schema
 ## Development
 
 ```sh
-python3 -m unittest discover -s tests            # ~5 s, uses a throwaway root
+python3 -m unittest discover -s tests            # ~5 s, throwaway root, includes parallel renders
 SOUVI_SHOW_CMD=1 ./souvi render <slug> --draft   # echo every ffmpeg command
 ```
 

@@ -9,8 +9,15 @@
 
 from __future__ import annotations
 
+import atexit
+import contextlib
+import fcntl
 import os
 import re
+import shutil
+import sys
+import tempfile
+import time
 from pathlib import Path
 
 ROOT = Path(os.environ.get("SOUVI_ROOT", Path(__file__).resolve().parent.parent))
@@ -52,10 +59,17 @@ class Project:
         d.mkdir(parents=True, exist_ok=True)
         return d
 
-    def work(self, *parts: str) -> Path:
-        d = self.cache.joinpath(*parts)
-        d.mkdir(parents=True, exist_ok=True)
-        return d
+    @contextlib.contextmanager
+    def lock(self, what: str = "render"):
+        """Serialise heavy jobs per project: a second render waits instead of fighting for CPU."""
+        self.cache.mkdir(parents=True, exist_ok=True)
+        with open(self.cache / f".{what}.lock", "w") as fh:
+            try:
+                fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                print(f"  … another {what} of '{self.slug}' is running; waiting", file=sys.stderr)
+                fcntl.flock(fh, fcntl.LOCK_EX)
+            yield
 
     def resolve(self, ref: str) -> Path:
         """Resolve a media reference: absolute, project-asset-relative, shared, or repo-relative."""
@@ -74,12 +88,52 @@ class Project:
         return [d for d in (self.assets / "fonts", SHARED / "fonts") if d.is_dir()]
 
 
+_reserved: list[Path] = []
+
+
 def next_version(directory: Path, stem: str, ext: str) -> Path:
-    """output/<slug>/renders/<stem>_v003.mp4 — never overwrite an earlier render."""
+    """output/<slug>/renders/<stem>_v003.mp4 — never overwrite an earlier render.
+
+    The name is reserved atomically (O_EXCL placeholder), so parallel jobs never pick the same
+    version. Placeholders still empty when the process exits (failed job) are removed.
+    """
     directory.mkdir(parents=True, exist_ok=True)
     pat = re.compile(rf"^{re.escape(stem)}_v(\d{{3}})\.")
-    taken = [int(m.group(1)) for f in directory.iterdir() if (m := pat.match(f.name))]
-    return directory / f"{stem}_v{(max(taken) + 1 if taken else 1):03d}.{ext}"
+    n = max((int(m.group(1)) for f in directory.iterdir() if (m := pat.match(f.name))), default=0) + 1
+    while True:
+        path = directory / f"{stem}_v{n:03d}.{ext}"
+        try:
+            os.close(os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644))
+        except FileExistsError:
+            n += 1
+            continue
+        _reserved.append(path)
+        return path
+
+
+@atexit.register
+def _drop_empty_reservations() -> None:
+    for p in _reserved:
+        with contextlib.suppress(OSError):
+            if p.stat().st_size == 0:
+                p.unlink()
+
+
+@contextlib.contextmanager
+def run_dir(project: "Project | None", label: str, *, keep: bool = False):
+    """A private working folder for one job: cache/<slug>/runs/<label>-<time>-<pid>/.
+
+    Unique per process, so any number of agents can work at once. Removed afterwards unless
+    `keep` (renders keep their graphs for debugging; bulky audio is pruned by the caller).
+    """
+    base = (project.cache if project else CACHE / "_scratch") / "runs"
+    base.mkdir(parents=True, exist_ok=True)
+    d = Path(tempfile.mkdtemp(prefix=f"{label}-{time.strftime('%Y%m%d-%H%M%S')}-{os.getpid()}-", dir=base))
+    try:
+        yield d
+    finally:
+        if not keep:
+            shutil.rmtree(d, ignore_errors=True)
 
 
 def project_from_path(path: Path) -> Project | None:

@@ -103,6 +103,33 @@ class Timeline(unittest.TestCase):
         self.assertLessEqual(L.true_peak, -1.0)
 
 
+class Concurrency(unittest.TestCase):
+    def test_parallel_version_reservation_never_collides(self):
+        from concurrent.futures import ProcessPoolExecutor
+        d = TMP / "race"
+        with ProcessPoolExecutor(8) as pool:
+            names = list(pool.map(_reserve, [str(d)] * 32))
+        self.assertEqual(len(set(names)), 32)
+
+    def test_parallel_renders_of_one_project_all_succeed(self):
+        p = project.create("par", preset="youtube-1080p", fps=25)
+        spec = {"canvas": {"width": 320, "height": 180, "fps": 25},
+                "video": [{"color": "#334455", "duration": 1}], "audio": []}
+        (p.dir / "timeline.json").write_text(json.dumps(spec))
+        env = {**os.environ, "SOUVI_ROOT": str(TMP), "PYTHONPATH": str(REPO)}
+        procs = [subprocess.Popen([sys.executable, "-m", "engine", "render", "par", "--draft"], env=env,
+                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) for _ in range(3)]
+        outs = [pr.communicate()[0] for pr in procs]
+        self.assertEqual([pr.returncode for pr in procs], [0, 0, 0], outs)
+        renders = sorted(f.name for f in (p.output / "drafts").glob("*.mp4"))
+        self.assertEqual(renders, ["par_v001.mp4", "par_v002.mp4", "par_v003.mp4"])
+        self.assertTrue(all((p.output / "drafts" / r).stat().st_size > 0 for r in renders))
+
+
+def _reserve(d):
+    return next_version(Path(d), "cut", "mp4").name
+
+
 class Mastering(unittest.TestCase):
     def test_master_reaches_target_under_ceiling(self):
         src, dst = TMP / "loud.wav", TMP / "loud.master.wav"

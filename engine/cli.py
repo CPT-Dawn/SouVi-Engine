@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import os
+import shutil
 import json
 import sys
 from pathlib import Path
 
 from . import __version__, audio, ff, inspect, loudness, presets, probe, qc, timeline, titles, video
 from . import project as projmod
-from .paths import ROOT, SHARED, Project, default_out_dir, next_version, project_from_path
+from .paths import ROOT, SHARED, Project, default_out_dir, next_version, project_from_path, run_dir
 
 
 # ---------------------------------------------------------------- helpers
@@ -24,8 +27,12 @@ def _src(path: str) -> Path:
 
 
 def _rel(p: Path) -> str:
+    """Repo-relative inside the SouVi repo; absolute when called from another repo."""
+    p = p.resolve()
+    if Path.cwd().resolve() != ROOT:
+        return str(p)
     try:
-        return str(p.resolve().relative_to(ROOT))
+        return str(p.relative_to(ROOT))
     except ValueError:
         return str(p)
 
@@ -39,13 +46,13 @@ def _derived(src: Path, tag: str, ext: str | None, out: str | None) -> Path:
     return next_version(base, f"{src.stem}.{tag}", ext)
 
 
-def _work(src: Path, project: str | None) -> Path:
-    p = Project(project) if project else project_from_path(src)
-    if p:
-        return p.work("tmp")
-    d = ROOT / "cache" / "_scratch"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+_JOBS = contextlib.ExitStack()  # private run folders, removed when the command exits
+
+
+def _work(src: Path | None, project: str | None, label: str = "job") -> Path:
+    """A private working folder for this command (parallel agents never share temp files)."""
+    p = Project(project) if project else (project_from_path(src) if src else None)
+    return _JOBS.enter_context(run_dir(p, label))
 
 
 def _print_report(rep: dict) -> None:
@@ -77,7 +84,7 @@ def cmd_new(a):
 def cmd_projects(a):
     rows = projmod.list_projects()
     if not rows:
-        print("no projects yet — ./souvi new <slug>")
+        print("no projects yet — souvi new <slug>")
     for r in rows:
         print(f"  {r['slug']:<28} assets {r['assets']:>4}   outputs {r['outputs']:>4}   latest {r['latest']}")
 
@@ -138,13 +145,49 @@ def cmd_promote(a):
         raise SystemExit("promote expects a file under output/<slug>/")
     dst = timeline.promote(src, p, a.name)
     print(f"→ {_rel(dst)}")
+    if a.to:
+        to = Path(a.to).expanduser().resolve()
+        to.mkdir(parents=True, exist_ok=True)
+        tmp = to / f".{dst.name}.part"
+        shutil.copy2(dst, tmp)
+        os.replace(tmp, to / dst.name)
+        print(f"→ {to / dst.name}")
+
+
+KIND_BY_EXT = {
+    **dict.fromkeys(("mp4", "mov", "mkv", "webm", "avi", "m4v", "mxf", "mts"), "footage"),
+    **dict.fromkeys(("png", "jpg", "jpeg", "webp", "tif", "tiff", "heic", "avif", "bmp", "exr"), "images"),
+    **dict.fromkeys(("wav", "mp3", "flac", "aac", "m4a", "ogg", "opus", "aif", "aiff"), "music"),
+    **dict.fromkeys(("ttf", "otf", "woff", "woff2"), "fonts"),
+    **dict.fromkeys(("cube", "3dl"), "luts"),
+    "svg": "graphics",
+}
+
+
+def cmd_import(a):
+    p = Project(a.slug).require()
+    for f in a.files:
+        src = Path(f).expanduser().resolve()
+        if not src.is_file():
+            raise SystemExit(f"no such file: {f}")
+        kind = a.kind or KIND_BY_EXT.get(src.suffix.lower().lstrip("."), "refs")
+        dst = p.assets / kind / src.name
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if dst.exists() or dst.is_symlink():
+            print(f"  = {kind}/{src.name} (already imported)")
+            continue
+        if a.link:
+            dst.symlink_to(src)
+        else:
+            shutil.copy2(src, dst)
+        print(f"  + {kind}/{src.name}")
 
 
 def cmd_export(a):
     src = _src(a.file)
     pr = presets.load(a.preset)
     m = probe.probe(src)
-    work = _work(src, a.project)
+    work = _work(src, a.project, "export")
     out = Path(a.out).resolve() if a.out else next_version(default_out_dir(src, a.project, "renders"),
                                                            f"{src.stem}.{pr.name}", pr.ext)
     args = ["-i", str(src)]
@@ -215,13 +258,9 @@ def cmd_voice(a):
 
 
 def cmd_sfx(a):
-    if a.project:
-        dst_dir = Project(a.project).require().assets / "sfx"
-        work = Project(a.project).work("sfx")
-    else:
-        dst_dir, work = SHARED / "sfx", ROOT / "cache" / "_scratch"
+    dst_dir = Project(a.project).require().assets / "sfx" if a.project else SHARED / "sfx"
     dst_dir.mkdir(parents=True, exist_ok=True)
-    work.mkdir(parents=True, exist_ok=True)
+    work = _work(None, a.project, "sfx")
     out = Path(a.out).resolve() if a.out else next_version(dst_dir, a.name or a.kind, "wav")
     rep = audio.sfx(a.kind, out, duration=a.duration, pitch=audio.note_ratio(a.pitch), mood=a.mood,
                     space=None if a.space == "none" else a.space, work=work)
@@ -232,8 +271,8 @@ def cmd_sfx(a):
 def cmd_reverb(a):
     src = _src(a.file)
     out = _derived(src, f"verb-{a.space}", "wav", a.out)
-    tmp = _work(src, None) / f"{src.stem}.verb.wav"
-    audio.reverb(src, tmp, space=a.space, mix=a.mix, work=tmp.parent)
+    tmp = _work(src, None, "reverb") / f"{src.stem}.verb.wav"
+    audio.reverb(src, tmp, space=a.space, mix=a.mix)
     ff.run(["-i", str(tmp), "-af", "aresample=48000:osf=s32:dither_method=triangular_hp", "-c:a", "pcm_s24le", str(out)])
     print(f"→ {_rel(out)}")
 
@@ -246,7 +285,7 @@ def cmd_fx(a):
     src = _src(a.file)
     m = probe.probe(src)
     out = _derived(src, a.cmd, "mov", a.out)
-    work = _work(src, None)
+    work = _work(src, None, a.cmd)
     mezz = _mezz_args() + ["-c:a", "pcm_s24le"]
     if a.cmd == "stabilize":
         video.stabilize(src, out, work, smoothing=a.smoothing, zoom=a.zoom, codec_args=_mezz_args())
@@ -364,8 +403,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--gpu", action="store_true", help="NVENC for drafts"); p.add_argument("--preset")
     p.add_argument("--until", type=float, help="render only the first N seconds")
     p.add_argument("--out"); p.add_argument("--no-qc", action="store_true")
-    p = cmd("promote", cmd_promote, "copy an approved render to output/<slug>/final/")
-    p.add_argument("render"); p.add_argument("--name")
+    p = cmd("promote", cmd_promote, "copy an approved render to output/<slug>/final/ (and --to a folder)")
+    p.add_argument("render"); p.add_argument("--name"); p.add_argument("--to", help="also deliver here, e.g. your repo")
+    p = cmd("import", cmd_import, "bring media into assets/<slug>/ (kind from extension; audio defaults to music)")
+    p.add_argument("slug"); p.add_argument("files", nargs="+")
+    p.add_argument("--as", dest="kind", choices=["footage", "images", "music", "voice", "sfx", "graphics", "fonts", "luts", "refs"])
+    p.add_argument("--link", action="store_true", help="symlink instead of copy (large footage)")
 
     p = cmd("export", cmd_export, "re-encode any file to a delivery preset (fit, color, loudness)")
     p.add_argument("file"); p.add_argument("--preset", required=True); p.add_argument("--project")
@@ -425,7 +468,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     args = build_parser().parse_args(argv)
     try:
-        rc = args.fn(args)
+        with _JOBS:
+            rc = args.fn(args)
     except (ff.FFError, timeline.TimelineError, FileNotFoundError, ValueError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

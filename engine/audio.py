@@ -8,6 +8,7 @@ then mastered to a sensible mixing level, leaving headroom for the mix.
 from __future__ import annotations
 
 import math
+import os
 from pathlib import Path
 
 from . import ff, loudness
@@ -53,23 +54,31 @@ SPACES = {  # name: (RT60 seconds, damping lowpass Hz, predelay ms)
 }
 
 
-def make_ir(path: Path, space: str = "hall") -> Path:
+def make_ir(space: str = "hall") -> Path:
+    """Impulse response for a space, synthesized once and shared by every job (written atomically)."""
+    from .paths import CACHE
+    path = CACHE / "_shared" / f"ir_{space}_v1.wav"
+    if path.exists():
+        return path
+    path.parent.mkdir(parents=True, exist_ok=True)
     rt, damp, pre = SPACES[space]
     dur = rt * 1.2
     k = 6.91 / rt  # exp(-k t) reaches -60 dB at RT60
     pre_s = pre / 1000
     env = f"if(lt(t,{pre_s}),0,exp(-{k:.4f}*(t-{pre_s})))"
     expr = f"(random(0)*2-1)*{env}|(random(1)*2-1)*{env}"
+    tmp = path.with_name(f".{path.stem}.{os.getpid()}.wav")
     ff.run([
         "-f", "lavfi", "-i", f"aevalsrc=exprs='{expr}':s={SR}:d={dur:.3f}",
         "-af", f"highpass=f=180,lowpass=f={damp},lowpass=f={damp * 1.4:.0f}",
-        "-c:a", "pcm_f32le", str(path),
+        "-c:a", "pcm_f32le", str(tmp),
     ])
+    os.replace(tmp, path)  # atomic: concurrent readers never see a half-written file
     return path
 
 
-def reverb(src: Path, dst: Path, *, space: str = "hall", mix: float = 0.22, work: Path) -> Path:
-    ir = make_ir(work / f"ir_{space}.wav", space)
+def reverb(src: Path, dst: Path, *, space: str = "hall", mix: float = 0.22) -> Path:
+    ir = make_ir(space)
     tail = SPACES[space][0] * 1.2
     graph = (
         f"[0:a]aresample={SR},aformat=sample_fmts=fltp:channel_layouts=stereo,apad=pad_dur={tail:.2f},asplit=2[dry][toverb];"
@@ -167,7 +176,7 @@ def sfx(kind: str, dst: Path, *, duration: float | None = None, pitch: float = 1
     space = default_space if space == "default" else space
     src = raw
     if space:
-        src = reverb(raw, work / f"sfx_{kind}_verb.wav", space=space, mix=0.18 if kind != "drone" else 0.35, work=work)
+        src = reverb(raw, work / f"sfx_{kind}_verb.wav", space=space, mix=0.18 if kind != "drone" else 0.35)
     return loudness.master(src, dst, target_lufs=lufs, target_tp=tp, sample_rate=SR,
                            codec_args=["-c:a", "pcm_s24le"], sample_fmt="s32", dither="triangular_hp",
                            label=f"level {kind}")

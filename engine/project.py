@@ -16,7 +16,10 @@ def create(slug: str, *, title: str | None = None, preset: str = "youtube-1080p"
         raise SystemExit(f"project '{slug}' already exists at {p.dir}")
     pr = load_preset(preset)
     w, h = pr.size or (1920, 1080)
-    p.dir.mkdir(parents=True)
+    try:
+        p.dir.mkdir(parents=True)
+    except FileExistsError:  # another agent created it a moment ago
+        raise SystemExit(f"project '{slug}' already exists at {p.dir}") from None
     for d in ASSET_DIRS:
         (p.assets / d).mkdir(parents=True, exist_ok=True)
         (p.assets / d / ".gitkeep").touch()

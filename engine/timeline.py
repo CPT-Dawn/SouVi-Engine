@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import shutil
 import time
 from dataclasses import dataclass, field
@@ -22,7 +23,7 @@ from pathlib import Path
 
 from . import audio as audiomod
 from . import ff, loudness, titles, video
-from .paths import Project, next_version
+from .paths import Project, next_version, run_dir
 from .presets import Preset, load as load_preset
 from .probe import MediaInfo, probe
 
@@ -453,12 +454,22 @@ def build_audio_graph(plan_: Plan) -> tuple[list[str], str] | None:
 
 def render(project: Project, *, timeline: str = "timeline", draft: bool = False, gpu: bool = False,
            preset_name: str | None = None, out: Path | None = None, until: float | None = None) -> dict:
+    """Render under the project lock in a private run folder (safe with parallel agents)."""
+    with project.lock("render"), run_dir(project, f"render-{timeline}", keep=True) as work:
+        manifest = _render(project, work, timeline=timeline, draft=draft, gpu=gpu,
+                           preset_name=preset_name, out=out, until=until)
+        for bulky in work.glob("*.wav"):   # keep graphs + titles for debugging, drop audio
+            bulky.unlink()
+        return manifest
+
+
+def _render(project: Project, work: Path, *, timeline: str, draft: bool, gpu: bool,
+            preset_name: str | None, out: Path | None, until: float | None) -> dict:
     t0 = time.monotonic()
     spec = load_spec(project, timeline)
     p = plan(project, spec, draft=draft, preset_name=preset_name)
     for w in p.warnings:
         print(f"  ! {w}")
-    work = project.work("render", timeline)
     preset = p.preset
 
     # 1-3: audio mix + master
@@ -518,6 +529,7 @@ def render(project: Project, *, timeline: str = "timeline", draft: bool = False,
         "output": str(out), "preset": preset.name, "draft": draft, "duration": round(dur, 3),
         "canvas": [p.width, p.height, p.fps], "clips": len(p.clips), "warnings": p.warnings,
         "loudness": report, "elapsed_s": round(time.monotonic() - t0, 1),
+        "work_dir": str(work),
         "timeline_sha1": hashlib.sha1(json.dumps(spec, sort_keys=True).encode()).hexdigest()[:12],
     }
     out.with_suffix(out.suffix + ".json").write_text(json.dumps(manifest, indent=2))
@@ -527,5 +539,7 @@ def render(project: Project, *, timeline: str = "timeline", draft: bool = False,
 def promote(render_path: Path, project: Project, name: str | None = None) -> Path:
     """Copy an approved render into output/<slug>/final/ under a clean name."""
     dst = project.out("final") / (name or render_path.name.split("_v")[0] + render_path.suffix)
-    shutil.copy2(render_path, dst)
+    tmp = dst.with_name(f".{dst.name}.{os.getpid()}.part")
+    shutil.copy2(render_path, tmp)
+    os.replace(tmp, dst)  # atomic: a reader never sees a half-copied deliverable
     return dst

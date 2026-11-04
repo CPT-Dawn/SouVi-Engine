@@ -95,6 +95,7 @@ The whole mix is then mastered to the preset's loudness target with true-peak li
 
 ## Render artefacts
 
-`cache/<slug>/render/<timeline>/` holds `mix.wav`, `master.wav`, `titles.ass`, `video.graph.txt` and
-`audio.graph.txt` (the exact filtergraphs: read these to debug a render). Each render writes a
-`<file>.json` manifest beside it (timing, preset, loudness report, warnings).
+Each render runs in a private folder, `cache/<slug>/runs/render-<timeline>-<time>-<pid>/`, holding
+`titles.ass`, `video.graph.txt` and `audio.graph.txt` (the exact filtergraphs: read these to debug).
+The render's `<file>.json` manifest (beside the output) records that folder as `work_dir`, plus timing,
+preset, loudness report and warnings. Renders of one project queue on a lock; different projects run in parallel.
