@@ -1,0 +1,12 @@
+description = "Intermediate for multi-step processing (stabilize -> grade -> edit). Visually lossless, keeps source size/fps, no loudness change."
+[video]
+codec = "prores_ks"
+pix_fmt = "yuv422p10le"
+params = ["-profile:v", "3", "-vendor", "apl0"]
+keep_source_geometry = true
+[audio]
+codec = "pcm_s24le"
+sample_rate = 48000
+[container]
+ext = "mov"
+params = []

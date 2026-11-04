@@ -1,0 +1,31 @@
+# Color looks: ffmpeg filter chains applied in 10-bit after the edit, before titles.
+# Keep looks subtle; a premium grade is felt, not noticed. Add your own below.
+# LUT-based looks: put .cube files in assets/_shared/luts/ and use {"lut": "luts/name.cube"}.
+
+[neutral]
+description = "Clean polish: gentle contrast, slight saturation, fine sharpening."
+filter = "eq=contrast=1.04:saturation=1.05,unsharp=5:5:0.25:5:5:0"
+
+[filmic]
+description = "Soft filmic: lifted blacks, rolled-off highlights, cool shadows / warm highlights."
+filter = "curves=master='0/0.035 0.25/0.22 0.5/0.5 0.75/0.78 1/0.955',colorbalance=rs=-0.02:bs=0.03:rh=0.025:bh=-0.02,eq=saturation=0.94"
+
+[teal-orange]
+description = "Blockbuster complementary split: teal shadows, amber skin and highlights."
+filter = "curves=master='0/0.02 0.3/0.26 0.7/0.74 1/0.97',colorbalance=rs=-0.06:gs=0.01:bs=0.07:rm=0.03:bm=-0.03:rh=0.06:bh=-0.06,vibrance=intensity=0.12"
+
+[golden]
+description = "Warm golden-hour glow, soft contrast."
+filter = "colortemperature=temperature=5200:mix=0.6,curves=master='0/0.03 0.5/0.52 1/0.97',eq=saturation=1.06"
+
+[steel]
+description = "Cool, desaturated, modern tech / corporate."
+filter = "colortemperature=temperature=7600:mix=0.5,eq=saturation=0.82:contrast=1.06,curves=master='0/0.02 1/0.98'"
+
+[noir]
+description = "Rich black & white with deep blacks and silver highlights."
+filter = "hue=s=0,curves=master='0/0 0.18/0.1 0.5/0.5 0.85/0.92 1/1',eq=contrast=1.08"
+
+[pastel]
+description = "Airy, bright, low-contrast lifestyle look."
+filter = "curves=master='0/0.08 0.5/0.56 1/0.98',eq=saturation=0.85,colorbalance=rh=0.01:bh=0.02"

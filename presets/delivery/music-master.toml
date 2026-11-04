@@ -1,0 +1,11 @@
+description = "Music / sound master for streaming platforms (Spotify, Apple Music, YouTube): 24-bit 48 kHz WAV at -14 LUFS / -1 dBTP."
+[audio]
+codec = "pcm_s24le"
+sample_rate = 48000
+channels = 2
+[loudness]
+integrated = -14.0
+true_peak = -1.0
+[container]
+ext = "wav"
+params = []

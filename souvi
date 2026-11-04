@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# SouVi Engine entry point. Pure Python stdlib + ffmpeg: no venv needed.
+here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+exec env PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" PYTHONDONTWRITEBYTECODE=1 python3 -m engine "$@"

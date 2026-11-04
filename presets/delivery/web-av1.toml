@@ -1,0 +1,20 @@
+description = "Modern web delivery (AV1 + Opus in WebM). ~40% smaller than H.264 at equal quality."
+[video]
+codec = "libsvtav1"
+width = 1920
+height = 1080
+pix_fmt = "yuv420p10le"
+crf = 30
+preset = "4"
+params = ["-svtav1-params", "tune=0:enable-overlays=1:film-grain=0"]
+[audio]
+codec = "libopus"
+bitrate = "192k"
+sample_rate = 48000
+channels = 2
+[loudness]
+integrated = -14.0
+true_peak = -1.0
+[container]
+ext = "webm"
+params = []

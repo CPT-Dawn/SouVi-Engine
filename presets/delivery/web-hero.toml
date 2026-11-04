@@ -1,0 +1,12 @@
+description = "Silent autoplay website background loop. Small, fast-starting, no audio track."
+[video]
+codec = "libx264"
+width = 1920
+height = 1080
+pix_fmt = "yuv420p"
+crf = 23
+preset = "slower"
+params = ["-profile:v", "high", "-x264-params", "aq-mode=3", "-g", "60"]
+[container]
+ext = "mp4"
+params = ["-movflags", "+faststart"]

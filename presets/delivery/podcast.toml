@@ -1,0 +1,12 @@
+description = "Spoken word / podcast distribution: -16 LUFS, -1.5 dBTP, MP3 192k 44.1 kHz."
+[audio]
+codec = "libmp3lame"
+bitrate = "192k"
+sample_rate = 44100
+channels = 2
+[loudness]
+integrated = -16.0
+true_peak = -1.5
+[container]
+ext = "mp3"
+params = ["-id3v2_version", "3"]

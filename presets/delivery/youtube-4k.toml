@@ -1,0 +1,20 @@
+description = "YouTube / Vimeo 4K upload. HEVC 10-bit: smooth gradients, no banding on skies or dark fades."
+[video]
+codec = "libx265"
+width = 3840
+height = 2160
+pix_fmt = "yuv420p10le"
+crf = 17
+preset = "slow"
+params = ["-tag:v", "hvc1", "-x265-params", "aq-mode=3:no-sao=1:deblock=-1,-1:log-level=error"]
+[audio]
+codec = "aac"
+bitrate = "320k"
+sample_rate = 48000
+channels = 2
+[loudness]
+integrated = -14.0
+true_peak = -1.0
+[container]
+ext = "mp4"
+params = ["-movflags", "+faststart"]

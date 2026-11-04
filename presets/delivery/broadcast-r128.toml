@@ -1,0 +1,11 @@
+description = "EBU R128 broadcast deliverable: -23 LUFS, -1 dBTP, 24-bit 48 kHz WAV."
+[audio]
+codec = "pcm_s24le"
+sample_rate = 48000
+channels = 2
+[loudness]
+integrated = -23.0
+true_peak = -1.0
+[container]
+ext = "wav"
+params = []

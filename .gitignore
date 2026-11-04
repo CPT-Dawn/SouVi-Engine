@@ -1,0 +1,18 @@
+# Disposable intermediates
+cache/
+__pycache__/
+*.pyc
+
+# Media is large: git tracks the folder structure and the plans (projects/), not the media.
+# (For versioned media, set up Git LFS and narrow these rules.)
+assets/**
+!assets/**/
+!assets/**/.gitkeep
+!assets/README.md
+output/**
+!output/**/
+!output/**/.gitkeep
+!output/README.md
+
+.env
+.DS_Store

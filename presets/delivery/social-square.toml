@@ -1,0 +1,20 @@
+description = "Instagram / LinkedIn feed 1:1."
+[video]
+codec = "libx264"
+width = 1080
+height = 1080
+pix_fmt = "yuv420p"
+crf = 17
+preset = "slow"
+params = ["-profile:v", "high", "-x264-params", "aq-mode=3:deblock=-1,-1"]
+[audio]
+codec = "aac"
+bitrate = "256k"
+sample_rate = 48000
+channels = 2
+[loudness]
+integrated = -14.0
+true_peak = -1.0
+[container]
+ext = "mp4"
+params = ["-movflags", "+faststart"]

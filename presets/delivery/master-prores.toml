@@ -1,0 +1,15 @@
+description = "Archival / hand-off master. ProRes 422 HQ 10-bit + 24-bit PCM. Edit-friendly, visually lossless, huge."
+[video]
+codec = "prores_ks"
+pix_fmt = "yuv422p10le"
+params = ["-profile:v", "3", "-vendor", "apl0", "-bits_per_mb", "8000"]
+[audio]
+codec = "pcm_s24le"
+sample_rate = 48000
+channels = 2
+[loudness]
+integrated = -16.0
+true_peak = -1.0
+[container]
+ext = "mov"
+params = []

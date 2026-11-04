@@ -1,0 +1,80 @@
+# Typography styles for timeline "titles". Rendered with libass (subpixel-accurate,
+# antialiased). Sizes are fractions of canvas height so styles scale to any format.
+# font: any installed family (fc-list) or a file in assets/<project>/fonts / assets/_shared/fonts.
+# align: libass numpad (1-9). margin_*: fractions of canvas width/height.
+# tracking: letter spacing in px at 1080p. fade: [in, out] ms. drift: rise in px during the title.
+
+[hero]
+font = "Inter Display Light"
+size = 0.085
+color = "#F5F5F2"
+tracking = 14
+expand = 8          # tracking grows by this many px across the title: slow, premium breathe
+align = 5
+fade = [900, 700]
+shadow = 0.0
+blur = 0.6
+
+[kicker]
+font = "Inter Medium"
+size = 0.026
+color = "#D9D6CF"
+tracking = 9
+uppercase = true
+align = 5
+offset_y = -0.085
+fade = [700, 600]
+
+[subtitle]
+font = "Inter Light"
+size = 0.036
+color = "#E9E7E2"
+tracking = 2
+align = 5
+offset_y = 0.075
+fade = [800, 600]
+
+[lower-third]
+font = "Inter SemiBold"
+size = 0.04
+color = "#FFFFFF"
+tracking = 1
+align = 1
+margin_x = 0.07
+margin_y = 0.11
+fade = [500, 400]
+drift = 10
+shadow = 1.2
+shadow_color = "#000000A0"
+
+[lower-third-sub]
+font = "Inter Regular"
+size = 0.028
+color = "#E6E6E6"
+tracking = 1
+align = 1
+margin_x = 0.07
+margin_y = 0.075
+fade = [600, 400]
+drift = 10
+shadow = 1.0
+shadow_color = "#000000A0"
+
+[caption]
+font = "Inter Medium"
+size = 0.042
+color = "#FFFFFF"
+align = 2
+margin_y = 0.08
+fade = [120, 120]
+outline = 0.0
+box = true
+box_color = "#00000088"
+
+[end-card]
+font = "Inter Display Medium"
+size = 0.06
+color = "#FFFFFF"
+tracking = 4
+align = 5
+fade = [800, 1200]
