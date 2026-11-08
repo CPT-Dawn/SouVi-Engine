@@ -12,3 +12,17 @@ This repo is the engine. How to *use* it lives in the `souvi` skill (`skill/SKIL
 - After engine changes: `python3 -m unittest discover -s tests`, then render a draft of a real project
   and review it with `souvi look`.
 - Skill or agent changes: keep `skill/SKILL.md` short; detail goes in its sibling files.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `CPT-Dawn/SouVi-Engine` (via `gh`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
